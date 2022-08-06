@@ -1,4 +1,4 @@
-# Smart Bee Designs Bee Motion S3 Arduino Helper Library
+# Bee Motion S3 Arduino Helper Library
 
 This is the helper library for The Bee Motion S3.
 
