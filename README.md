@@ -12,13 +12,12 @@ This library can be installed through the Arduino library manager or manually fr
 
 ```c++
 
-// Initializes all UM board peripherals
 void begin();
 
-// Set LDO2 on or off (ProS3 and FeatherS3 only)
+// Set LDO2 on or off
 void setLDO2Power(bool on);
 
-// Set neopixel power on or off (On ProS3 and Feather it sets LDO2 on)
+// Set neopixel power on or off
 void setPixelPower(bool on);
 
 // Set neopixel color
