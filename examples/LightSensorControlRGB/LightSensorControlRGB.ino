@@ -1,4 +1,4 @@
-// This code shows how to use control the RGB brightness by the level of the ambiet light level.
+// This code shows how to control the RGB brightness by the level of the ambiet light level.
 // the darker the ambient light, the brighter the RGB gets and vise versa.
 
 #include <BMS3.h> //include the bee motion s3 helper library
