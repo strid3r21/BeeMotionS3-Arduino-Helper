@@ -117,7 +117,7 @@ class BMS3 {
     float getBatteryVoltage() {
       uint32_t raw = adc1_get_raw(VBAT_ADC_CHANNEL);
       uint32_t millivolts = esp_adc_cal_raw_to_voltage(raw, &adc_cal);
-      const uint32_t upper_divider = 442;
+      const uint32_t upper_divider = 422;
       const uint32_t lower_divider = 160;
       return (float)(upper_divider + lower_divider) / lower_divider / 1000 * millivolts;
     }
