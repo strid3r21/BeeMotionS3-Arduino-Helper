@@ -7,7 +7,9 @@
 
 
 #define VBAT_ADC_CHANNEL ADC1_GPIO1_CHANNEL
+#define VBAT_GPIO 1
 #define ALS_ADC_CHANNEL ADC1_GPIO3_CHANNEL
+#define ALS_GPIO 3
 
 #define green 0,150,0
 #define red  150,0,0
@@ -29,12 +31,28 @@ class BMS3 {
     void begin() {
       // RGB_PWR in on LDO2 so we can turn it completely off during deep sleep
       pinMode(RGB_PWR, OUTPUT);
-      rmt = rmtInit(RGB_DATA, RMT_TX_MODE, RMT_MEM_64);
-      rmtSetTick(rmt, 25);
+	  
+      #if ESP_ARDUINO_VERSION_MAJOR < 3
+		rmt = rmtInit(RGB_DATA, RMT_TX_MODE, RMT_MEM_64);
+		rmtSetTick(rmt, 25);
+		#else
+			rmtInit(RGB_DATA, RMT_TX_MODE, RMT_MEM_NUM_BLOCKS_1, 10000000);
+	  #endif
 
-      esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_2_5, ADC_WIDTH_BIT_12, 0, &adc_cal);
-      adc1_config_channel_atten(VBAT_ADC_CHANNEL, ADC_ATTEN_DB_2_5);
-      adc1_config_channel_atten(ALS_ADC_CHANNEL, ADC_ATTEN_DB_11);
+	#if ESP_ARDUINO_VERSION_MAJOR < 3
+		esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_2_5, ADC_WIDTH_BIT_12, 0,&adc_cal);
+		adc1_config_channel_atten(VBAT_ADC_CHANNEL, ADC_ATTEN_DB_2_5);
+	#else
+		analogSetPinAttenuation(VBAT_GPIO, ADC_2_5db);
+	#endif
+		
+		#if ESP_ARDUINO_VERSION_MAJOR < 3
+			adc1_config_channel_atten(ALS_ADC_CHANNEL, ADC_ATTEN_DB_11);
+		#else
+			analogSetPinAttenuation(ALS_GPIO, ADC_11db);
+		#endif
+
+
       pinMode(VBUS_SENSE, INPUT);
 	  pinMode(PIR, INPUT);
 	  digitalWrite(LDO2, HIGH);
@@ -72,31 +90,48 @@ class BMS3 {
       writePixel();
     }
 
-    void writePixel() {
-      while (micros() < next_rmt_write) {
-        yield();
-      }
-      int index = 0;
-      for (auto chan : pixel_color) {
-        uint8_t value = chan * (brightness + 1) >> 8;
-        for (int bit = 7; bit >= 0; bit--) {
-          if ((value >> bit) & 1) {
-            rmt_data[index].level0 = 1;
-            rmt_data[index].duration0 = 32; // 800ns
-            rmt_data[index].level1 = 0;
-            rmt_data[index].duration1 = 18; // 450ns
-          } else {
-            rmt_data[index].level0 = 1;
-            rmt_data[index].duration0 = 16; // 400ns
-            rmt_data[index].level1 = 0;
-            rmt_data[index].duration1 = 34; // 850ns
-          }
-          index++;
-        }
-      }
-      rmtWrite(rmt, rmt_data, 3 * 8);
-      next_rmt_write = micros() + 350;
+     void writePixel() {
+    setPixelPower(true);
+    while (micros() - next_rmt_write < 350) {
+      yield();
     }
+    int index = 0;
+    for (auto chan : pixel_color) {
+      uint8_t value = chan * (brightness + 1) >> 8;
+      for (int bit = 7; bit >= 0; bit--) {
+        if ((value >> bit) & 1) {
+			#if ESP_ARDUINO_VERSION_MAJOR < 3
+					rmt_data[index].level0 = 1;
+					rmt_data[index].duration0 = 32; 
+					rmt_data[index].level1 = 0;
+					rmt_data[index].duration1 = 18; 
+					} else {
+					rmt_data[index].level0 = 1;
+					rmt_data[index].duration0 = 16; 
+					rmt_data[index].level1 = 0;
+					rmt_data[index].duration1 = 34; 
+			#else
+					rmt_data[index].level0 = 1;
+					rmt_data[index].duration0 = 8;
+					rmt_data[index].level1 = 0;
+					rmt_data[index].duration1 = 4;
+					} else {
+					rmt_data[index].level0 = 1;
+					rmt_data[index].duration0 = 4;
+					rmt_data[index].level1 = 0;
+					rmt_data[index].duration1 = 8;
+			#endif
+        }
+        index++;
+      }
+    }
+		#if ESP_ARDUINO_VERSION_MAJOR < 3
+			rmtWrite(rmt, rmt_data, 3 * 8);
+		#else
+			rmtWrite(RGB_DATA, rmt_data, 3 * 8, RMT_WAIT_FOR_EVER);
+		#endif
+			next_rmt_write = micros();
+  }
 
     static uint32_t color(uint8_t r, uint8_t g, uint8_t b) {
       return (r << 16) | (g << 8) | b;
@@ -115,18 +150,29 @@ class BMS3 {
     }
 
     float getBatteryVoltage() {
-      uint32_t raw = adc1_get_raw(VBAT_ADC_CHANNEL);
-      uint32_t millivolts = esp_adc_cal_raw_to_voltage(raw, &adc_cal);
-      const uint32_t upper_divider = 442;
-      const uint32_t lower_divider = 160;
-      return (float)(upper_divider + lower_divider) / lower_divider / 1000 * millivolts;
-    }
+      #if ESP_ARDUINO_VERSION_MAJOR < 3
+    		uint32_t raw = adc1_get_raw(VBAT_ADC_CHANNEL);
+    		uint32_t millivolts = esp_adc_cal_raw_to_voltage(raw, &adc_cal);
+		#else
+			uint32_t millivolts = analogReadMilliVolts(VBAT_GPIO);
+		#endif
+			const uint32_t upper_divider = 442;
+			const uint32_t lower_divider = 160;
+			return (float)(upper_divider + lower_divider) / lower_divider / 1000 *
+				millivolts;
+  }
 
 
     float getLight() {
-      uint32_t raw = adc1_get_raw(ALS_ADC_CHANNEL);
-      uint32_t millivolts = esp_adc_cal_raw_to_voltage(raw, &adc_cal);
-      return millivolts / 1000.0f;
+      #if ESP_ARDUINO_VERSION_MAJOR < 3
+			uint32_t raw = adc1_get_raw(ALS_ADC_CHANNEL);
+			uint32_t millivolts = esp_adc_cal_raw_to_voltage(raw, &adc_cal);
+			
+		#else
+			uint32_t millivolts = analogReadMilliVolts(ALS_GPIO);
+		#endif
+		
+    return millivolts / 1000.0f;
     }
 	
 
@@ -137,7 +183,9 @@ class BMS3 {
     }
 
   private:
-    rmt_obj_t *rmt;
+    #if ESP_ARDUINO_VERSION_MAJOR < 3
+ 		 rmt_obj_t *rmt;
+	#endif
     rmt_data_t rmt_data[3 * 8];
     unsigned long next_rmt_write;
     uint8_t pixel_color[3];

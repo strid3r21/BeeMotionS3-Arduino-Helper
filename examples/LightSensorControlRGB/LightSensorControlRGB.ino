@@ -16,7 +16,7 @@ void setup() {
 void loop() {
   float lightLevel = bms3.getLight(); //get the ambient light level
   Serial.println(lightLevel); // print the light level so we can reference it.
-  int rgbLevel = map(lightLevel, .3, 1.2, 255, 0); //map the light level input to a range between 255 - 0
+  int rgbLevel = map(lightLevel, .3, 2.0, 255, 0); //map the light level input to a range between 255 - 0
  bms3.setPixelBrightness(rgbLevel); // set the RGB brihtness to that mapped brightness level based on ambiet light level
 bms3.setPixelColor(blue); //turn on the RGB to Blue or whatever other color you'd like
 
